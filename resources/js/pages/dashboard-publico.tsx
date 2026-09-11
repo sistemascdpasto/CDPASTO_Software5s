@@ -80,6 +80,8 @@ export default function DashboardPublico({ areas, activos, metaDefault, token }:
     const [meta] = useState<number>(metaDefault);
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const [reintento, setReintento] = useState(0);
 
     const hayRangoFechas = fechaDesde !== '' || fechaHasta !== '';
 
@@ -117,13 +119,19 @@ export default function DashboardPublico({ areas, activos, metaDefault, token }:
         params.set('meta', String(meta));
 
         setLoading(true);
+        setError(false);
         fetch(`${route('qr.publico.data', token)}?${params.toString()}`, {
             headers: { Accept: 'application/json' },
         })
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`Respuesta inesperada del servidor (${res.status}).`);
+
+                return res.json();
+            })
             .then((json: DashboardData) => setData(json))
+            .catch(() => setError(true))
             .finally(() => setLoading(false));
-    }, [mes, anio, fechaDesde, fechaHasta, hayRangoFechas, areaId, activoId, meta, token]);
+    }, [mes, anio, fechaDesde, fechaHasta, hayRangoFechas, areaId, activoId, meta, token, reintento]);
 
     const metaAnnotation = (axis: 'x' | 'y') => ({
         metaLine: {
@@ -585,6 +593,14 @@ export default function DashboardPublico({ areas, activos, metaDefault, token }:
                     </Card>
 
                     {loading && <p className="text-muted-foreground text-center text-sm">Cargando...</p>}
+                    {error && !loading && (
+                        <div className="flex flex-col items-center gap-2 text-center text-sm">
+                            <p className="text-destructive">No se pudieron cargar los datos del dashboard. Verifica tu conexión e intenta de nuevo.</p>
+                            <Button variant="outline" size="sm" onClick={() => setReintento((n) => n + 1)}>
+                                Reintentar
+                            </Button>
+                        </div>
+                    )}
                     {data && data.tarjetas.checklists_ejecutados === 0 && (
                         <p className="text-muted-foreground text-center text-sm">No hay checklists diligenciados con estos filtros.</p>
                     )}

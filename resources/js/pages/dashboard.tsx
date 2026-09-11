@@ -94,7 +94,9 @@ export default function Dashboard({ areas, activos, metaDefault, responsables }:
     const [meta, setMeta] = useState<number>(metaDefault);
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [exportandoPdf, setExportandoPdf] = useState(false);
+    const [reintento, setReintento] = useState(0);
 
     // Referencias a cada gráfica para poder capturarlas como imagen (canvas.
     // toBase64Image()) y mandarlas al backend al exportar a PDF — DomPDF no
@@ -145,13 +147,19 @@ export default function Dashboard({ areas, activos, metaDefault, responsables }:
         params.set('meta', String(meta));
 
         setLoading(true);
+        setError(false);
         fetch(`${route('dashboard.data')}?${params.toString()}`, {
             headers: { Accept: 'application/json' },
         })
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`Respuesta inesperada del servidor (${res.status}).`);
+
+                return res.json();
+            })
             .then((json: DashboardData) => setData(json))
+            .catch(() => setError(true))
             .finally(() => setLoading(false));
-    }, [mes, anio, fechaDesde, fechaHasta, hayRangoFechas, areaId, activoId, meta]);
+    }, [mes, anio, fechaDesde, fechaHasta, hayRangoFechas, areaId, activoId, meta, reintento]);
 
     // Línea de meta (HU-22), comparable contra el % de adherencia en todos los
     // gráficos que manejan porcentaje — no aplica al de "Top oportunidades", que
@@ -700,6 +708,14 @@ export default function Dashboard({ areas, activos, metaDefault, responsables }:
                 </Card>
 
                 {loading && <p className="text-muted-foreground text-center text-sm">Cargando...</p>}
+                {error && !loading && (
+                    <div className="flex flex-col items-center gap-2 text-center text-sm">
+                        <p className="text-destructive">No se pudieron cargar los datos del dashboard. Verifica tu conexión e intenta de nuevo.</p>
+                        <Button variant="outline" size="sm" onClick={() => setReintento((n) => n + 1)}>
+                            Reintentar
+                        </Button>
+                    </div>
+                )}
                 {data && data.tarjetas.checklists_ejecutados === 0 && (
                     <p className="text-muted-foreground text-center text-sm">No hay checklists diligenciados con estos filtros.</p>
                 )}
